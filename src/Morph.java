@@ -3,8 +3,6 @@
 // All rights reserved.
 // 
 // Date: 2014-10-31
-
-
 import javax.swing.*;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
@@ -13,8 +11,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
-
 public class Morph extends JPanel {
 	
 	private static final long serialVersionUID = 1L;
@@ -23,16 +21,13 @@ public class Morph extends JPanel {
 	private static final int maxHeight = 320;
 	private static final File openPath = new File(".");
 	private static final int sliderGranularity = 100;
-
 	private static final double scalingX = 1.0 / 0.76;
 	private static final double scalingY = 1.0 / 0.66;
-
 	private static JFrame frame;
 	
 	private ImageView startView;		// image view for start picture
 	private ImageView morphView;		// image view for intermediate picture
 	private ImageView endView;			// image view for end picture
-
 	private double morphPos;			// 0.0 is "start", 1.0 is "end"
 	
 	private JSlider morphSlider;		// slider for current morphing position
@@ -42,7 +37,6 @@ public class Morph extends JPanel {
 	 
 	public Morph() {
         super(new BorderLayout(borderWidth, borderWidth));
-
         setBorder(BorderFactory.createEmptyBorder(borderWidth,borderWidth,borderWidth,borderWidth));
  
         // load the default images
@@ -133,7 +127,6 @@ public class Morph extends JPanel {
         JComponent newContentPane = new Morph();
         newContentPane.setOpaque(true); //content panes must be opaque
         frame.setContentPane(newContentPane);
-
         // display the window.
         frame.pack();
         Toolkit toolkit = Toolkit.getDefaultToolkit();
@@ -141,7 +134,6 @@ public class Morph extends JPanel {
         frame.setLocation((screenSize.width - frame.getWidth()) / 2, (screenSize.height - frame.getHeight()) / 2);
         frame.setVisible(true);
 	}
-
 	public static void main(String[] args) {
         //Schedule a job for the event-dispatching thread:
         //creating and showing this application's GUI.
@@ -163,15 +155,18 @@ public class Morph extends JPanel {
 			scaleLeft();
 			break;
 		case 2:
-			scaleRigth();
+			scaleRight();
 			break;
 		case 3:
-			moveScaleLeftImage();
+			scaleMoveLeft();
 			break;
 		case 4:
-			moveScaleRigthImage();
-			break; // !!!
-			
+				scaleMoveRight();
+				break;
+		case 5:
+				morph();
+				break;
+		// TODO: add the other methods here
 		default:
 			Arrays.fill(morphView.getPixels(), 0xffffffff); // white image
 			break;
@@ -183,11 +178,7 @@ public class Morph extends JPanel {
 		long time = System.currentTimeMillis() - startTime;
     	statusLine.setText("Processing time: " + time + " ms");
 	}
-
 	
-
-
-	//links wird ausgeblendet, rechts wird eingeblendet
 	
 	void crossfade() {
 		int[] pixA = startView.getPixels();
@@ -197,7 +188,6 @@ public class Morph extends JPanel {
 		int width = morphView.getImgWidth();
 		int height = morphView.getImgHeight();
 		double a = morphPos;
-		
 		
 		for(int y = 0; y < height; y++) {
 			for(int x = 0; x < width; x++) {
@@ -223,9 +213,7 @@ public class Morph extends JPanel {
 		}
 	}
 	
-	//macht kinen Apfel kleiner
-
-	void scaleLeft() {
+void scaleLeft() {
 		
 		// This implements a simple nearest neighbor scaling.
 		// You may replace it by a bilinear scaling for better visual results
@@ -236,7 +224,7 @@ public class Morph extends JPanel {
 		int width = morphView.getImgWidth();
 		int height = morphView.getImgHeight();
 		double a = morphPos;
-	
+		
 		for(int y = 0; y < height; y++) {
 			for(int x = 0; x < width; x++) {
 				int posM = y * width + x;
@@ -249,24 +237,15 @@ public class Morph extends JPanel {
 				int xA = (int)(x * xS);
 				int yA = (int)(y * yS);
 				
-				int argb = 0xffffffff; // white pixel
-				
-				if(xA >= 0 && xA < width && yA >= 0 && yA < height) {
-					// we are inside image A
-					argb = pixA[yA * width + xA];
-				}
-
-				int rM = (argb >> 16) & 0xff;
-				int gM = (argb >>  8) & 0xff;
-				int bM = (argb)       & 0xff;
-				
-				//
-				
-				pixM[posM] = 0xFF000000 | (rM << 16) | (gM << 8) | bM;
+				shiften(xA, yA, width, height, posM, pixA, pixM);
 			}
-		}}
-	
-	void scaleRigth() {
+		}
+	}
+
+void scaleRight() {
+		
+		// This implements a simple nearest neighbor scaling.
+		// You may replace it by a bilinear scaling for better visual results
 		
 		int[] pixA = endView.getPixels();
 		int[] pixM = morphView.getPixels();
@@ -279,42 +258,56 @@ public class Morph extends JPanel {
 			for(int x = 0; x < width; x++) {
 				int posM = y * width + x;
 				
-				
 				// current scaling
-				double xS = scalingX *  (1 - a) ; //a= morphPos, angegeben in %
-				double yS = scalingY * (1 - a);
-				
-				
+				double xS = 1 / scalingX * 1.0 * a + (1 - a);
+				double yS = 1 / scalingY * 1.0 * a + (1 - a);
 				
 				// scaled coordinates in image A
-				int xA = (int)(x * xS);
-				int yA = (int)(y * yS);
+				int xB = (int)(x * xS);
+				int yB = (int)(y * yS);
 				
-				int argb = 0xffffffff; // white pixel
-				
-				if(xA >= 0 && xA < width && yA >= 0 && yA < height) {
-					// we are inside image A
-					argb = pixA[yA * width + xA];
-				}
-
-				int rM = (argb >> 16) & 0xff;
-				int gM = (argb >>  8) & 0xff;
-				int bM = (argb)       & 0xff;
-				
-				//
-				
-				pixM[posM] = 0xFF000000 | (rM << 16) | (gM << 8) | bM;
+				shiften(xB, yB, width, height, posM, pixA, pixM);
 			}
 		}
 	}
-	
-	
-			//links nach rechts verschieben
-			
-	 void moveScaleLeftImage()
-			{
 
-		 int[] pixA = startView.getPixels();
+
+
+
+void scaleMoveLeft() {
+	
+	// This implements a simple nearest neighbor scaling.
+	// You may replace it by a bilinear scaling for better visual results
+	
+	int[] pixA = startView.getPixels();
+	int[] pixM = morphView.getPixels();
+	
+	int width = morphView.getImgWidth();
+	int height = morphView.getImgHeight();
+	double a = morphPos;
+	
+	for(int y = 0; y < height; y++) {
+		for(int x = 0; x < width; x++) {
+			int posM = y * width + x;
+			
+			// current scaling
+			double xS = scalingX * a + 1.0 * (1 - a);
+			double yS = scalingY * a + 1.0 * (1 - a);
+			
+			// scaled coordinates in image A
+			int xA = (int)((x * xS)-(width/1.3)*a);
+			int yA = (int)((y * yS)-(height/3)*a);
+			
+			shiften(xA, yA, width, height, posM, pixA, pixM);
+		}
+	}
+}
+void scaleMoveRight() {
+	
+	// This implements a simple nearest neighbor scaling.
+			// You may replace it by a bilinear scaling for better visual results
+			
+			int[] pixB = endView.getPixels();
 			int[] pixM = morphView.getPixels();
 			
 			int width = morphView.getImgWidth();
@@ -326,72 +319,127 @@ public class Morph extends JPanel {
 					int posM = y * width + x;
 					
 					// current scaling
-					double xS = scalingX * a + 1.0 * (1 - a);
-					double yS = scalingY * a + 1.0 * (1 - a);
+					double xS = 1 / scalingX * 1.1 * a + (1 - a);
+					double yS = 1 / scalingY * 1.1 * a + (1 - a);
 					
 					// scaled coordinates in image A
-					int xA = (int)(x * xS) - (int) (a*(width/4*3));
-					int yA = (int)(y * yS) - (int) (a*100);
+					int xB = (int)((x * xS)+(width/1.8)*a);
+					int yB = (int)((y * yS)+(height/5.33)*a);
 					
-					int argb = 0xffffffff; // white pixel
-					
-					if(xA >= 0 && xA < width && yA >= 0 && yA < height) {
-						// we are inside image A
-						argb = pixA[yA * width + xA];
-					}
-
-					int rM = (argb >> 16) & 0xff;
-					int gM = (argb >>  8) & 0xff;
-					int bM = (argb)       & 0xff;
-					
-					//
-					
-					pixM[posM] = 0xFF000000 | (rM << 16) | (gM << 8) | bM;
+					shiften(xB, yB, width, height, posM, pixB, pixM);
 				}
 			}
 		}
-			
-	void moveScaleRigthImage()
-			{
 
-		 int[] pixA = endView.getPixels();
-			int[] pixM = morphView.getPixels();
-			
-			int width = morphView.getImgWidth();
-			int height = morphView.getImgHeight();
-			double a = morphPos;
-			
-			for(int y = 0; y < height; y++) {
-				for(int x = 0; x < width; x++) {
-					int posM = y * width + x;
-					
-					// current scaling
-					double xS = scalingX * a + 1.0 * (1 - a);
-					double yS = scalingY * a + 1.0 * (1 - a);
-					
-					// scaled coordinates in image A
-					int xA = (int)(x * xS) - (int) (a*(width/4*3));
-					int yA = (int)(y * yS) - (int) (a*100);
-					
-					int argb = 0xffffffff; // white pixel
-					
-					if(xA >= 0 && xA < width && yA >= 0 && yA < height) {
-						// we are inside image A
-						argb = pixA[yA * width + xA];
-					}
 
-					int rM = (argb >> 16) & 0xff;
-					int gM = (argb >>  8) & 0xff;
-					int bM = (argb)       & 0xff;
-					
-					//
-					
-					pixM[posM] = 0xFF000000 | (rM << 16) | (gM << 8) | bM;
-				}
+private void morph() {
+	
+	int[] pixA = startView.getPixels();
+	int[] pixM = morphView.getPixels();
+	int[] pixB = endView.getPixels();
+	
+	int width = morphView.getImgWidth();
+	int height = morphView.getImgHeight();
+	double a = morphPos;
+	
+	// Scale and Move left image
+	for(int y = 0; y < height; y++) {
+		for(int x = 0; x < width; x++) {
+			int posM = y * width + x;
+			
+			// current scaling
+			double xS = scalingX * (a) + 1.0 * (1-a);
+			double yS = scalingY * (a) + 1.0 * (1-a);	
+			
+			// scaled coordinates in image A
+			int xA = (int)((x * xS)-(width/1.3)*(a));
+			int yA = (int)((y * yS)-(height/3)*(a));
+			
+			int argb = 0xffffffff; // white pixel
+			
+			if(xA >= 0 && xA < width && yA >= 0 && yA < height) {
+				// we are inside image A
+				argb = pixA[yA * width + xA];
+			}
+			int rM = (argb >> 16) & 0xff;
+			int gM = (argb >>  8) & 0xff;
+			int bM = (argb)       & 0xff;
+			
+			
+			pixM[posM] = 0xFF000000 | (rM << 16) | (gM << 8) | bM;
 		}
+	}
+	pixA = pixM.clone();
+	
+	// Scale and Move right image
+	for(int y = 0; y < height; y++
+			) {
+		for(int x = 0; x < width; x++) {
+			int posM = y * width + x;
+			
+			// current scaling
+			double xS = 1 / scalingX * (1-a) + a * 1.0;
+			double yS = 1 / scalingY * (1-a) + a * 1.0;
+			
+			// scaled coordinates in image A
+			int xB = (int)((x * xS)+(width/1.8)*(1-a));
+			int yB = (int)((y * yS)+(height/4.33)*(1-a));
+			
+			int argb = 0xffffffff; // white pixel
+			
+			if(xB >= 0 && xB < width && yB >= 0 && yB < height) {
+				// we are inside image B
+				argb = pixB[yB * width + xB];
+			}
+			int rM = (argb >> 16) & 0xff;
+			int gM = (argb >>  8) & 0xff;
+			int bM = (argb)       & 0xff;
+			
+			
+			pixM[posM] = 0xFF000000 | (rM << 16) | (gM << 8) | bM;
+		}
+	}
+	pixB = pixM.clone();
+	
+	
+	for(int y = 0; y < height; y++) {
+		for(int x = 0; x < width; x++) {
+			int posM = y * width + x;
+			
+			int argb = pixA[posM];
+			int rA = (argb >> 16) & 0xff;
+			int gA = (argb >>  8) & 0xff;
+			int bA = (argb)       & 0xff;
+			
+			argb = pixB[posM];
+			
+			int rB = (argb >> 16) & 0xff;
+			int gB = (argb >>  8) & 0xff;
+			int bB = (argb)       & 0xff;
+			
+			int rM = (int) ((1 - a) * rA + a * rB);
+			int gM = (int) ((1 - a) * gA + a * gB);
+			int bM = (int) ((1 - a) * bA + a * bB);
+			
+			pixM[posM] = 0xFF000000 | (rM << 16) | (gM << 8) | bM;
+		}
+	}
+}
+	
+	private void shiften(int x, int y, int width, int height, int pos, int[]pix1, int[] pix2)
+	{
+		int argb = 0xffffffff; // white pixel
 		
-			
-			}
-			
+		if(x >= 0 && x < width && y >= 0 && y < height) {
+			// we are inside image B
+			argb = pix1[y * width + x];
 		}
-
+		int r = (argb >> 16) & 0xff;
+		int g = (argb >>  8) & 0xff;
+		int b = (argb)       & 0xff;
+		
+		
+		pix2[pos] = 0xFF000000 | (r << 16) | (g << 8) | b;
+	}
+	
+}
